@@ -36,11 +36,23 @@ wall, so lower `--min-wall` or use a longer bit.
 
 ### Browser preview
 
-`preview.html` (with `layout.js`) is a local page: open it in a browser. It
-takes board sizes, spacing (even or irregular), tail-length fractions, and bit
-limits, draws the tails board and the sockets in the mating board to one
-scale, flags errors and warnings, lists each tail, and prints the matching
-`layout.py` command. Units switch between inches and millimeters.
+`preview.html` (with `layout.js`) is a local page: open it in a browser. There
+is no form. The drawings are the controls:
+
+- Three drawings to one scale: the tails board (face), the mating board
+  (section) and a side section. Width and thickness of both boards are on the
+  drawings. Both boards are taken as the same width, as in a box corner.
+- Drag the round handles: tail tips set length, the lower corners of a tail set
+  its width, board edges set sizes, dashed lines set cutter length and wall.
+  Shift skips snapping.
+- Click any number to type it (`5/8`, `1 1/2`, `0.75`, `12mm`, or `7/8t` for a
+  fraction of the mating board thickness). The bit and limits are click-to-type
+  values under the drawings.
+- Toolbar: Even or Irregular spacing, tail count, length presets, in/mm.
+
+It flags errors and warnings, lists each tail, and prints the matching
+`layout.py` command. Tails board thickness is stored (`--tails-thickness`) for
+the toolpath layer and does not change the layout.
 
 `layout.js` is a port of `layout.py`; `test_crosscheck.py` runs both on the
 same cases and compares them (skipped when Node is missing).
@@ -66,6 +78,15 @@ anchor (closed right triangle, red fill, no stroke). Shaper docs:
 - Bit angle convention: 15 degrees assumed per side from the plunge axis;
   check by measuring the cutter diameter 13.5 mm above the tip
   (about 6.57 mm if per side, about 10.25 mm if included)
+
+## Fit offset
+
+Origin has its own Cut Offset setting (positive cuts inside the design,
+negative outside), used for fit and for rough then finish passes
+([Shaper: Cut Offset](https://support.shapertools.com/hc/articles/115002894693)).
+It cannot be applied to On Line or Guide cuts. So the glue offset likely belongs
+on the tool, not in the file, and the v0 slot generator's `online` finish path
+would not take an offset. To be reworked in the toolpath layer.
 
 ## Retraction risk
 

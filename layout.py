@@ -49,6 +49,7 @@ class Layout:
     min_neck: float = 3.0              # mm minimum tail base width (assumed)
     glue_offset: float = 0.1           # mm per side (assumed; used by the toolpath layer)
     joint_angle_deg: float = 90.0      # stored only
+    tails_thickness: float = None      # mm, tails board thickness; None means same as the mating board (stored; the toolpath layer will use it)
 
     def check(self):
         errors, warnings = [], []
@@ -141,7 +142,9 @@ def from_widths(width, thickness, widths, lengths, bit=None, validate=True, **kw
 
 
 def summary(lay: Layout) -> str:
-    rows = ["  #  center  tip_w  base_w  length"]
+    tt = lay.tails_thickness if lay.tails_thickness is not None else lay.thickness
+    rows = [f"tails board {lay.width:g} x {tt:g} mm, mating board {lay.width:g} x {lay.thickness:g} mm",
+            "  #  center  tip_w  base_w  length"]
     for i, t in enumerate(sorted(lay.tails, key=lambda t: t.center), 1):
         rows.append(f"{i:3d} {t.center:7.2f} {t.tip_width:6.2f} {t.base_width(lay.bit):7.2f} {t.length:7.2f}")
     errors, warnings = lay.check()
@@ -197,6 +200,8 @@ def main(argv=None):
     p.add_argument("--angle", type=float, default=15.0, help="bit side angle, degrees")
     p.add_argument("--cutter-dia", type=float, default=13.8, help="bit widest diameter, mm")
     p.add_argument("--cutter-len", type=float, default=13.5, help="bit cutter length, mm")
+    p.add_argument("--tails-thickness", type=float, default=None,
+                   help="tails board thickness, mm (stored for the toolpath layer; default same as --thickness)")
     p.add_argument("--preview", help="write a preview SVG to this path")
     a = p.parse_args(argv)
     fr = parse_fractions(a.fractions)
@@ -205,12 +210,12 @@ def main(argv=None):
         w = [float(x) for x in a.widths.split(",")]
         lengths = cycled_lengths(a.thickness, fr, len(w) // 2)
         lay = from_widths(a.width, a.thickness, w, lengths, bit=bit,
-                          min_wall=a.min_wall, min_neck=a.min_neck)
+                          min_wall=a.min_wall, min_neck=a.min_neck, tails_thickness=a.tails_thickness)
     else:
         lay = even_layout(a.width, a.thickness, a.tails,
                           cycled_lengths(a.thickness, fr, a.tails),
                           bit=bit, ratio=a.ratio, half_pin=a.half_pin,
-                          min_wall=a.min_wall, min_neck=a.min_neck)
+                          min_wall=a.min_wall, min_neck=a.min_neck, tails_thickness=a.tails_thickness)
     print(summary(lay))
     if a.preview:
         with open(a.preview, "w") as f:
