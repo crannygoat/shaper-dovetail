@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dovetail Layout Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  /* Layout: a narrow rail of controls on the left, drawings and numbers on the right.
+     Both drawings share one horizontal scale so each tail sits directly above its socket. */
+  --bg: #eef0ec;
+  --surface: #f8f9f6;
+  --ink: #1b221f;
+  --muted: #58645c;
+  --rule: #cbd2ca;
+  --accent: #0f6b73;
+  --accent-ink: #ffffff;
+  --wood: #cfa066;
+  --wood-ink: #6a4720;
+  --board: #dde2db;
+  --warn: #8f5600;
+  --err: #b3261e;
+  --ok: #2c7a4b;
+  --font-ui: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-num: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111713;
+    --surface: #1a221d;
+    --ink: #e5ebe6;
+    --muted: #9aa69e;
+    --rule: #2e3932;
+    --accent: #58b9c2;
+    --accent-ink: #0b1a1c;
+    --wood: #a8763f;
+    --wood-ink: #e2bd8c;
+    --board: #25302a;
+    --warn: #e3a64c;
+    --err: #f0847b;
+    --ok: #6cc28e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111713;
+  --surface: #1a221d;
+  --ink: #e5ebe6;
+  --muted: #9aa69e;
+  --rule: #2e3932;
+  --accent: #58b9c2;
+  --accent-ink: #0b1a1c;
+  --wood: #a8763f;
+  --wood-ink: #e2bd8c;
+  --board: #25302a;
+  --warn: #e3a64c;
+  --err: #f0847b;
+  --ok: #6cc28e;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 var(--font-ui);
+  padding-block: 22px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1180px; margin: 0 auto; }
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 22px; }
+h1 { margin: 0; font-size: 1.6rem; font-weight: 700; letter-spacing: -0.015em; text-wrap: balance; }
+.sub { margin: 2px 0 0; color: var(--muted); max-width: 60ch; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 330px) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.rail { display: flex; flex-direction: column; gap: 22px; }
+.group { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.group > h2 { margin: 0; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field.wide { grid-column: 1 / -1; }
+label, .lab-text { font-size: 0.82rem; color: var(--muted); }
+.hint { font-size: 0.78rem; color: var(--muted); margin: 0; }
+input[type="text"], input[type="number"], textarea {
+  width: 100%;
+  font: 14px/1.3 var(--font-num);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 7px 9px;
+  min-width: 0;
+}
+textarea { resize: vertical; min-height: 4.5em; }
+input[aria-invalid="true"] { border-color: var(--err); }
+input:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.range-row { display: grid; grid-template-columns: minmax(0, 1fr) 3.4em; gap: 10px; align-items: center; }
+output { font: 13px var(--font-num); text-align: right; }
+
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 4px; padding: 0; margin: 0; overflow: hidden; background: var(--surface); }
+.seg label { margin: 0; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: block; padding: 6px 14px; font-size: 0.85rem; color: var(--ink); cursor: pointer; }
+.seg input:checked + span { background: var(--accent); color: var(--accent-ink); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: inherit; }
+.chip, .btn {
+  border: 1px solid var(--rule); background: var(--surface); color: var(--ink);
+  border-radius: 4px; padding: 5px 10px; font-size: 0.8rem; cursor: pointer;
+}
+.chip:hover, .btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+details summary { cursor: pointer; font-size: 0.82rem; color: var(--ink); padding: 2px 0; }
+details[open] summary { margin-bottom: 12px; }
+
+.out { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+#status { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+#status li { display: flex; gap: 10px; align-items: baseline; }
+.lab { flex: none; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; min-width: 4.4em; }
+.lab.err { color: var(--err); } .lab.warn { color: var(--warn); } .lab.ok { color: var(--ok); }
+figure { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.fig { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); padding: 8px; }
+.fig svg { display: block; width: 100%; height: auto; min-width: 420px; }
+figcaption { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: space-between; color: var(--muted); font-size: 0.82rem; }
+figcaption p { margin: 0; max-width: 62ch; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+td { font-family: var(--font-num); font-size: 13px; }
+th:first-child, td:first-child, th:last-child, td:last-child { text-align: left; }
+td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(--err); }
+.cmd { display: flex; flex-direction: column; gap: 8px; }
+.cmd code { display: block; overflow-x: auto; white-space: pre; font: 13px/1.5 var(--font-num); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; }
+.notes { margin: 0; color: var(--muted); font-size: 0.82rem; max-width: 70ch; }
+#fallback { font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Dovetail Layout Preview</h1>
+      <p class="sub">Layout only: tail positions, widths and depths, checked against the bit. No toolpaths yet.</p>
+    </div>
+    <fieldset class="seg" id="unitSeg" aria-label="Units">
+      <label><input type="radio" name="units" value="in" checked><span>in</span></label>
+      <label><input type="radio" name="units" value="mm"><span>mm</span></label>
+    </fieldset>
+  </header>
+
+  <div class="grid">
+    <form class="rail" id="form" autocomplete="off">
+      <section class="group">
+        <h2>Boards</h2>
+        <div class="fields">
+          <div class="field"><label for="width">Board width</label><input type="text" id="width" inputmode="decimal"></div>
+          <div class="field"><label for="thickness">Mating board thickness</label><input type="text" id="thickness" inputmode="decimal"></div>
+        </div>
+        <p class="hint">Type 5/8, 1 1/2, 0.75, or add mm or in to override the unit.</p>
+      </section>
+
+      <section class="group">
+        <h2>Spacing</h2>
+        <fieldset class="seg" id="modeSeg" aria-label="Spacing mode">
+          <label><input type="radio" name="mode" value="even" checked><span>Even</span></label>
+          <label><input type="radio" name="mode" value="irregular"><span>Irregular</span></label>
+        </fieldset>
+        <div id="evenBlock" class="fields">
+          <div class="field"><label for="tails">Tails</label><input type="number" id="tails" min="1" max="15" step="1" inputmode="numeric"></div>
+          <div class="field"></div>
+          <div class="field wide"><label for="ratio">Tail width to pin gap at the tips</label>
+            <div class="range-row"><input type="range" id="ratio" min="0.8" max="4" step="0.1"><output id="ratioOut" for="ratio"></output></div></div>
+          <div class="field wide"><label for="halfPin">Edge half-pin, in pin gaps</label>
+            <div class="range-row"><input type="range" id="halfPin" min="0" max="2" step="0.05"><output id="halfPinOut" for="halfPin"></output></div></div>
+        </div>
+        <div id="irrBlock" class="fields" hidden>
+          <div class="field wide"><label for="widths">Widths, pin then tail, ending on a pin</label>
+            <textarea id="widths" spellcheck="false"></textarea>
+            <p class="hint">Separate with commas or new lines. Tail widths are measured at the wide end. The widths should add up to the board width.</p></div>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Tail length</h2>
+        <div class="field"><label for="fractions">Fractions of the mating board thickness, cycled across the tails</label>
+          <input type="text" id="fractions" inputmode="text"></div>
+        <div class="chips" id="chips">
+          <button type="button" class="chip" data-frac="2/3">Uniform 2/3</button>
+          <button type="button" class="chip" data-frac="1/2">Uniform 1/2</button>
+          <button type="button" class="chip" data-frac="5/8, 7/8">Houndstooth 5/8, 7/8</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <details>
+          <summary>Bit and limits</summary>
+          <div class="fields">
+            <div class="field"><label for="angle">Bit angle per side, deg</label><input type="number" id="angle" min="1" max="44" step="0.5" inputmode="decimal"></div>
+            <div class="field"><label for="cutterDia">Cutter diameter</label><input type="text" id="cutterDia" inputmode="decimal"></div>
+            <div class="field"><label for="cutterLen">Cutter length</label><input type="text" id="cutterLen" inputmode="decimal"></div>
+            <div class="field"><label for="minWall">Minimum wall</label><input type="text" id="minWall" inputmode="decimal"></div>
+            <div class="field"><label for="minNeck">Minimum tail base</label><input type="text" id="minNeck" inputmode="decimal"></div>
+            <div class="field"><label for="glueOffset">Glue offset per side</label><input type="text" id="glueOffset" inputmode="decimal"></div>
+          </div>
+          <p class="hint">Angle, minimum wall, minimum base and glue offset are assumptions. The glue offset is for the toolpath layer and is not drawn here.</p>
+        </details>
+      </section>
+    </form>
+
+    <div class="out">
+      <div>
+        <ul id="status" role="status" aria-live="polite"></ul>
+        <p style="margin:8px 0 0"><button type="button" class="btn" id="useSum" hidden>Set board width to the sum</button></p>
+      </div>
+
+      <figure>
+        <div class="fig" id="faceFig"></div>
+        <figcaption>
+          <p>Tails board, face-on. Numbers under each tail are its length. A colored outline marks a warning or error.</p>
+          <button type="button" class="btn" id="copyFace">Copy SVG</button>
+        </figcaption>
+      </figure>
+
+      <figure>
+        <div class="fig" id="secFig"></div>
+        <figcaption>
+          <p>Sockets in the mating board, to the same horizontal scale. Dashed lines show the cutter length and the minimum wall.</p>
+          <button type="button" class="btn" id="copySec">Copy SVG</button>
+        </figcaption>
+      </figure>
+
+      <div class="tablewrap"><table id="tbl"></table></div>
+
+      <div class="cmd">
+        <span class="lab-text">The same layout from the command line</span>
+        <code id="cmd"></code>
+        <div><button type="button" class="btn primary" id="copyCmd">Copy command</button></div>
+        <textarea id="fallback" readonly hidden rows="4" aria-label="Text to copy"></textarea>
+      </div>
+
+      <p class="notes">Assumed, not verified: the bit angle is per side from the plunge axis, a 3 mm minimum wall, a 3 mm minimum tail base, a 0.1 mm glue offset. Houndstooth is read as tail length, meaning how far a tail enters the mating board. Angled joints and the Origin file are not part of this page.</p>
+    </div>
+  </div>
+</div>
+<script src="layout.js"></script>
+<script>
+(function () {
+  'use strict';
+  const DL = window.DovetailLayout;
+  const $ = (id) => document.getElementById(id);
+  const MM = DL.MM_PER_IN;
+  const STORE_KEY = 'dovetail-layout-preview-v2';
+
+  const DIMS = {
+    width: { label: 'Board width', strict: true },
+    thickness: { label: 'Mating board thickness', strict: true },
+    cutterDia: { label: 'Cutter diameter', strict: true },
+    cutterLen: { label: 'Cutter length', strict: true },
+    minWall: { label: 'Minimum wall', strict: false },
+    minNeck: { label: 'Minimum tail base', strict: false },
+    glueOffset: { label: 'Glue offset', strict: false },
+  };
+  const DEFAULT_MM = { width: 152.4, thickness: 15.875, cutterDia: 13.8, cutterLen: 13.5, minWall: 3, minNeck: 3, glueOffset: 0.1 };
+  const EXPORT_COLORS = { ink: '#1b221f', muted: '#58645c', board: '#dde2db', wood: '#cfa066', woodInk: '#6a4720', err: '#b3261e', warn: '#8f5600' };
+  const LIVE_COLORS = { ink: 'var(--ink)', muted: 'var(--muted)', board: 'var(--board)', wood: 'var(--wood)', woodInk: 'var(--wood-ink)', err: 'var(--err)', warn: 'var(--warn)' };
+
+  let units = 'in';
+  let lastMm = Object.assign({}, DEFAULT_MM);
+  let lastSvg = { face: '', sec: '' };
+
+  function trim(v, d) { return String(parseFloat(v.toFixed(d))); }
+  function fmtNum(mm, extra) {
+    const d = (units === 'in' ? 3 : 2) + (extra || 0);
+    return trim(units === 'in' ? mm / MM : mm, d);
+  }
+  function fmtUnit(mm) { return fmtNum(mm) + ' ' + units; }
+  function styleFor(colors, live) {
+    return Object.assign({}, colors, {
+      font: live ? "'Archivo', system-ui, sans-serif" : "Archivo, Arial, sans-serif",
+      fmt: (mm, short) => (short ? fmtNum(mm) : fmtUnit(mm)),
+    });
+  }
+
+  /* A field that still shows what we wrote keeps its exact value in millimetres,
+     so rounding for display never drifts the numbers. */
+  function writeDim(k, mm) {
+    const el = $(k);
+    el.value = fmtNum(mm, 1);
+    el.dataset.mm = String(mm);
+    el.dataset.shown = el.value;
+  }
+  function readDim(el) {
+    if (el.dataset.shown !== undefined && el.value === el.dataset.shown) return parseFloat(el.dataset.mm);
+    return DL.parseDim(el.value, units);
+  }
+  function writeDims(mm) {
+    Object.keys(DIMS).forEach((k) => writeDim(k, mm[k]));
+  }
+  function setIrregularText(widthsMm) {
+    $('widths').value = widthsMm.map((w) => fmtNum(w, 1)).join(', ');
+  }
+
+  function radio(name) { return document.querySelector('input[name="' + name + '"]:checked').value; }
+
+  function readInputs() {
+    const problems = [];
+    const d = {};
+    Object.keys(DIMS).forEach((k) => {
+      const el = $(k);
+      const v = readDim(el);
+      const ok = DIMS[k].strict ? v > 0 : v >= 0;
+      el.setAttribute('aria-invalid', ok ? 'false' : 'true');
+      if (ok) d[k] = v; else problems.push(DIMS[k].label + ': enter a number or a fraction such as 5/8.');
+    });
+    const angle = parseFloat($('angle').value);
+    const angleOk = angle >= 1 && angle <= 44;
+    $('angle').setAttribute('aria-invalid', angleOk ? 'false' : 'true');
+    if (!angleOk) problems.push('Bit angle: enter a value from 1 to 44 degrees.');
+    const fractions = DL.parseFractions($('fractions').value);
+    const fracOk = fractions.length > 0 && fractions.every((f) => f > 0 && f <= 1);
+    $('fractions').setAttribute('aria-invalid', fracOk ? 'false' : 'true');
+    if (!fracOk) problems.push('Tail length: use fractions of the thickness between 0 and 1, such as 2/3 or 5/8, 7/8.');
+    const mode = radio('mode');
+    const tails = parseInt($('tails').value, 10);
+    if (mode === 'even') {
+      const tOk = tails >= 1 && tails <= 15;
+      $('tails').setAttribute('aria-invalid', tOk ? 'false' : 'true');
+      if (!tOk) problems.push('Tails: enter a whole number from 1 to 15.');
+    }
+    let widths = [];
+    if (mode === 'irregular') {
+      widths = $('widths').value.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean).map((s) => DL.parseDim(s, units));
+      if (!widths.length || widths.some((w) => !(w > 0))) problems.push('Widths: enter positive numbers separated by commas.');
+    }
+    return { problems: problems, d: d, angle: angle, fractions: fractions, mode: mode, tails: tails, widths: widths };
+  }
+
+  function statusItem(kind, text) {
+    const li = document.createElement('li');
+    const b = document.createElement('strong');
+    b.className = 'lab ' + kind;
+    b.textContent = kind === 'err' ? 'Error' : kind === 'warn' ? 'Warning' : 'OK';
+    const span = document.createElement('span');
+    span.textContent = text;
+    li.appendChild(b); li.appendChild(span);
+    return li;
+  }
+
+  function render() {
+    const inp = readInputs();
+    const list = $('status');
+    list.textContent = '';
+    $('useSum').hidden = true;
+    if (inp.problems.length) {
+      inp.problems.forEach((p) => list.appendChild(statusItem('err', p)));
+      return;
+    }
+    const d = inp.d;
+    Object.assign(lastMm, d);
+    const bit = { sideAngleDeg: inp.angle, cutterDia: d.cutterDia, cutterLen: d.cutterLen };
+    const opts = { bit: bit, minWall: d.minWall, minNeck: d.minNeck, glueOffset: d.glueOffset,
+      ratio: parseFloat($('ratio').value), halfPin: parseFloat($('halfPin').value) };
+    const messages = [];
+    let res;
+    if (inp.mode === 'even') {
+      res = DL.evenLayout(d.width, d.thickness, inp.tails, DL.cycledLengths(d.thickness, inp.fractions, inp.tails), opts);
+    } else {
+      const n = Math.floor(inp.widths.length / 2);
+      res = DL.fromWidths(d.thickness, inp.widths, DL.cycledLengths(d.thickness, inp.fractions, Math.max(n, 1)), opts);
+      if (res.layout) {
+        const sum = res.layout.width;
+        if (Math.abs(sum - d.width) > 0.05) {
+          messages.push(['err', 'The widths add up to ' + fmtUnit(sum) + ', but the board width is ' + fmtUnit(d.width) + '.']);
+          $('useSum').hidden = false;
+          $('useSum').dataset.sum = String(sum);
+        }
+      }
+    }
+    if (!res.layout) {
+      res.errors.forEach((e) => list.appendChild(statusItem('err', e)));
+      return;
+    }
+    const lay = res.layout;
+    const chk = DL.check(lay, fmtUnit);
+    chk.errors.forEach((e) => messages.push(['err', e]));
+    chk.warnings.forEach((w) => messages.push(['warn', w]));
+    if (!messages.length) {
+      messages.push(['ok', 'Every tail fits the bit and leaves at least ' + fmtUnit(lay.minWall) + ' of wall. The limits are assumptions, so confirm with a test cut.']);
+    }
+    messages.forEach((m) => list.appendChild(statusItem(m[0], m[1])));
+
+    $('faceFig').innerHTML = DL.faceSvg(lay, styleFor(LIVE_COLORS, true));
+    $('secFig').innerHTML = DL.sectionSvg(lay, styleFor(LIVE_COLORS, true));
+    lastSvg.face = DL.faceSvg(lay, styleFor(EXPORT_COLORS, false));
+    lastSvg.sec = DL.sectionSvg(lay, styleFor(EXPORT_COLORS, false));
+    renderTable(lay);
+    $('cmd').textContent = buildCommand(inp, d);
+    $('ratioOut').textContent = parseFloat($('ratio').value).toFixed(1);
+    $('halfPinOut').textContent = parseFloat($('halfPin').value).toFixed(2);
+    save();
+  }
+
+  function renderTable(lay) {
+    const tbl = $('tbl');
+    tbl.textContent = '';
+    const head = document.createElement('thead');
+    const hr = document.createElement('tr');
+    ['Tail', 'Center', 'Tip width', 'Base width', 'Length', 'Wall left', 'Status'].forEach((h, i) => {
+      const th = document.createElement('th');
+      th.textContent = i > 0 && i < 6 ? h + ' (' + units + ')' : h;
+      hr.appendChild(th);
+    });
+    head.appendChild(hr);
+    tbl.appendChild(head);
+    const body = document.createElement('tbody');
+    DL.sortedTails(lay).forEach((t, i) => {
+      const s = DL.tailStatus(lay, t, fmtUnit);
+      const kind = s.errors.length ? 'err' : s.warnings.length ? 'warn' : 'ok';
+      const label = kind === 'err' ? 'Error' : kind === 'warn' ? 'Warning' : 'OK';
+      const tr = document.createElement('tr');
+      [String(i + 1), fmtNum(t.center), fmtNum(t.tipWidth), fmtNum(DL.baseWidth(t, lay.bit)), fmtNum(t.length), fmtNum(lay.thickness - t.length)]
+        .forEach((v) => { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+      const td = document.createElement('td');
+      td.className = kind; td.textContent = label;
+      tr.appendChild(td);
+      body.appendChild(tr);
+    });
+    tbl.appendChild(body);
+  }
+
+  function mmStr(v) { return trim(v, 4); }
+  function buildCommand(inp, d) {
+    const p = ['python3 layout.py', '--width ' + mmStr(d.width), '--thickness ' + mmStr(d.thickness)];
+    if (inp.mode === 'even') {
+      p.push('--tails ' + inp.tails, '--ratio ' + trim(parseFloat($('ratio').value), 3), '--half-pin ' + trim(parseFloat($('halfPin').value), 3));
+    } else {
+      p.push('--widths ' + inp.widths.map(mmStr).join(','));
+    }
+    p.push('--fractions "' + $('fractions').value.trim() + '"');
+    const D = DL.DEFAULT_BIT, L = DL.DEFAULT_LIMITS;
+    if (inp.angle !== D.sideAngleDeg) p.push('--angle ' + inp.angle);
+    if (Math.abs(d.cutterDia - D.cutterDia) > 1e-6) p.push('--cutter-dia ' + mmStr(d.cutterDia));
+    if (Math.abs(d.cutterLen - D.cutterLen) > 1e-6) p.push('--cutter-len ' + mmStr(d.cutterLen));
+    if (Math.abs(d.minWall - L.minWall) > 1e-6) p.push('--min-wall ' + mmStr(d.minWall));
+    if (Math.abs(d.minNeck - L.minNeck) > 1e-6) p.push('--min-neck ' + mmStr(d.minNeck));
+    return p.join(' \\\n  ');
+  }
+
+  function copyText(text) {
+    const fb = $('fallback');
+    const fallback = () => { fb.hidden = false; fb.value = text; fb.focus(); fb.select(); };
+    try {
+      navigator.clipboard.writeText(text).then(() => { fb.hidden = true; }, fallback);
+    } catch (e) { fallback(); }
+  }
+
+  function save() {
+    try {
+      const s = { units: units, mode: radio('mode'), dims: {} };
+      Object.keys(DIMS).forEach((k) => { s.dims[k] = [$(k).value, $(k).dataset.mm || '', $(k).dataset.shown || '']; });
+      ['tails', 'ratio', 'halfPin', 'fractions', 'widths', 'angle'].forEach((k) => { s[k] = $(k).value; });
+      localStorage.setItem(STORE_KEY, JSON.stringify(s));
+    } catch (e) { /* storage unavailable */ }
+  }
+  function restore() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return false;
+      const s = JSON.parse(raw);
+      units = s.units === 'mm' ? 'mm' : 'in';
+      document.querySelector('input[name="units"][value="' + units + '"]').checked = true;
+      Object.keys(DIMS).forEach((k) => {
+        const e = s.dims && s.dims[k];
+        if (!Array.isArray(e)) return;
+        $(k).value = e[0];
+        if (e[1] && e[2]) { $(k).dataset.mm = e[1]; $(k).dataset.shown = e[2]; }
+      });
+      ['tails', 'ratio', 'halfPin', 'fractions', 'widths', 'angle'].forEach((k) => { if (s[k] !== undefined) $(k).value = s[k]; });
+      document.querySelector('input[name="mode"][value="' + (s.mode === 'irregular' ? 'irregular' : 'even') + '"]').checked = true;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function showMode() {
+    const irr = radio('mode') === 'irregular';
+    $('evenBlock').hidden = irr;
+    $('irrBlock').hidden = !irr;
+  }
+
+  function currentEvenWidthsMm() {
+    const lay = DL.evenLayout(lastMm.width, lastMm.thickness, parseInt($('tails').value, 10) || 5,
+      DL.cycledLengths(lastMm.thickness, [0.5], parseInt($('tails').value, 10) || 5),
+      { ratio: parseFloat($('ratio').value), halfPin: parseFloat($('halfPin').value) }).layout;
+    if (!lay) return [];
+    const ts = DL.sortedTails(lay);
+    const out = [];
+    let x = 0;
+    ts.forEach((t) => {
+      out.push(t.center - t.tipWidth / 2 - x, t.tipWidth);
+      x = t.center + t.tipWidth / 2;
+    });
+    out.push(lay.width - x);
+    return out;
+  }
+
+  document.querySelectorAll('input[name="units"]').forEach((el) => el.addEventListener('change', () => {
+    const next = radio('units');
+    if (next === units) return;
+    const inp = readInputs();
+    const keep = inp.problems.length ? lastMm : inp.d;
+    let widthsMm = null;
+    if (!inp.problems.length && inp.mode === 'irregular') widthsMm = inp.widths;
+    units = next;
+    writeDims(Object.assign({}, lastMm, keep));
+    if (widthsMm) setIrregularText(widthsMm);
+    render();
+  }));
+  document.querySelectorAll('input[name="mode"]').forEach((el) => el.addEventListener('change', () => {
+    showMode();
+    if (radio('mode') === 'irregular' && !$('widths').value.trim()) setIrregularText(currentEvenWidthsMm());
+    render();
+  }));
+  $('form').addEventListener('submit', (e) => e.preventDefault());
+  $('form').addEventListener('input', render);
+  $('chips').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-frac]');
+    if (!b) return;
+    $('fractions').value = b.dataset.frac;
+    render();
+  });
+  $('useSum').addEventListener('click', () => {
+    const sum = parseFloat($('useSum').dataset.sum);
+    if (sum > 0) { writeDim('width', sum); render(); }
+  });
+  $('copyFace').addEventListener('click', () => copyText(lastSvg.face));
+  $('copySec').addEventListener('click', () => copyText(lastSvg.sec));
+  $('copyCmd').addEventListener('click', () => copyText($('cmd').textContent));
+
+  /* initial state: a plain 5-tail half-blind layout, 6 in wide on 5/8 in stock */
+  $('tails').value = '5';
+  $('ratio').value = '2';
+  $('halfPin').value = '0.5';
+  $('fractions').value = '2/3';
+  $('angle').value = '15';
+  writeDims(DEFAULT_MM);
+  restore();
+  showMode();
+  render();
+})();
+</script>
+</body>
+</html>

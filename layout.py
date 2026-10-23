@@ -102,7 +102,8 @@ def cycled_lengths(thickness, fractions, n):
     return [float(f) * thickness for f in islice(cycle(fractions), n)]
 
 
-def even_layout(width, thickness, n_tails, lengths, bit=None, ratio=2.0, half_pin=0.5, **kw):
+def even_layout(width, thickness, n_tails, lengths, bit=None, ratio=2.0, half_pin=0.5,
+                validate=True, **kw):
     """n tails across width. ratio = tail tip width / pin gap at the tips.
     half_pin = edge half-pin width as a fraction of a full pin gap.
     width = p * (2*half_pin + n*(ratio + 1) - 1), solved for the pin gap p."""
@@ -116,11 +117,12 @@ def even_layout(width, thickness, n_tails, lengths, bit=None, ratio=2.0, half_pi
         tails.append(Tail(center=x + t / 2, tip_width=t, length=lengths[i]))
         x += t + p
     lay = Layout(width, thickness, tails, bit or Bit(), **kw)
-    lay.validate()
+    if validate:
+        lay.validate()
     return lay
 
 
-def from_widths(width, thickness, widths, lengths, bit=None, **kw):
+def from_widths(width, thickness, widths, lengths, bit=None, validate=True, **kw):
     """Irregular spacing. widths alternate pin, tail, pin, ..., pin (odd count,
     edge half-pins included) and must sum to the board width."""
     if len(widths) % 2 == 0 or len(widths) < 3:
@@ -133,7 +135,8 @@ def from_widths(width, thickness, widths, lengths, bit=None, **kw):
             tails.append(Tail(center=x + w / 2, tip_width=w, length=lengths[len(tails)]))
         x += w
     lay = Layout(width, thickness, tails, bit or Bit(), **kw)
-    lay.validate()
+    if validate:
+        lay.validate()
     return lay
 
 
@@ -185,19 +188,29 @@ def main(argv=None):
     p.add_argument("--fractions", default="2/3",
                    help="tail lengths as fractions of thickness, cycled; '5/8,7/8' is houndstooth")
     p.add_argument("--widths", help="irregular: pin,tail,pin,...,pin widths in mm (overrides --tails/--ratio)")
+    p.add_argument("--half-pin", type=float, default=0.5,
+                   help="edge half-pin width as a fraction of a full pin gap")
     p.add_argument("--min-wall", type=float, default=3.0,
                    help="minimum wall left in front of a socket, mm (default is an assumption)")
+    p.add_argument("--min-neck", type=float, default=3.0,
+                   help="minimum tail base width, mm (default is an assumption)")
+    p.add_argument("--angle", type=float, default=15.0, help="bit side angle, degrees")
+    p.add_argument("--cutter-dia", type=float, default=13.8, help="bit widest diameter, mm")
+    p.add_argument("--cutter-len", type=float, default=13.5, help="bit cutter length, mm")
     p.add_argument("--preview", help="write a preview SVG to this path")
     a = p.parse_args(argv)
     fr = parse_fractions(a.fractions)
+    bit = Bit(a.angle, a.cutter_dia, a.cutter_len)
     if a.widths:
         w = [float(x) for x in a.widths.split(",")]
         lengths = cycled_lengths(a.thickness, fr, len(w) // 2)
-        lay = from_widths(a.width, a.thickness, w, lengths, min_wall=a.min_wall)
+        lay = from_widths(a.width, a.thickness, w, lengths, bit=bit,
+                          min_wall=a.min_wall, min_neck=a.min_neck)
     else:
         lay = even_layout(a.width, a.thickness, a.tails,
                           cycled_lengths(a.thickness, fr, a.tails),
-                          ratio=a.ratio, min_wall=a.min_wall)
+                          bit=bit, ratio=a.ratio, half_pin=a.half_pin,
+                          min_wall=a.min_wall, min_neck=a.min_neck)
     print(summary(lay))
     if a.preview:
         with open(a.preview, "w") as f:

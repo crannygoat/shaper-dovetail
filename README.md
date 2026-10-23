@@ -34,6 +34,19 @@ the cutter length (13.5 mm), and a minimum wall in front of the socket
 thickness fits only on stock up to about 15.4 mm, which leaves about 1.9 mm of
 wall, so lower `--min-wall` or use a longer bit.
 
+### Browser preview
+
+`preview.html` (with `layout.js`) is a local page: open it in a browser. It
+takes board sizes, spacing (even or irregular), tail-length fractions, and bit
+limits, draws the tails board and the sockets in the mating board to one
+scale, flags errors and warnings, lists each tail, and prints the matching
+`layout.py` command. Units switch between inches and millimeters.
+
+`layout.js` is a port of `layout.py`; `test_crosscheck.py` runs both on the
+same cases and compares them (skipped when Node is missing).
+`build_artifact.py out.html` makes a single-file version with `layout.js`
+inlined.
+
 Angled (non-orthogonal) joints: `joint_angle_deg` is stored but not applied yet.
 Twisted dovetails are not supported; a straight-axis bit likely cannot cut them.
 
