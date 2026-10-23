@@ -120,10 +120,11 @@
     const o = opts || {};
     const ratio = o.ratio !== undefined ? o.ratio : 2.0;
     const halfPin = o.halfPin !== undefined ? o.halfPin : 0.5;
+    const shift = o.shift || 0;
     if (!(n >= 1)) return { layout: null, errors: ['need at least one tail'] };
     const p = width / (2 * halfPin + n * (ratio + 1) - 1);
     const t = ratio * p;
-    let x = halfPin * p;
+    let x = halfPin * p + shift;
     const tails = [];
     for (let i = 0; i < n; i += 1) {
       tails.push({ center: x + t / 2, tipWidth: t, length: lengths[i] });
@@ -263,6 +264,24 @@
     return st.woodInk;
   }
 
+  /* How far the whole pattern sits off the board centre (positive is right), from the outer tips. */
+  function patternOffset(lay) {
+    const ts = sortedTails(lay);
+    if (!ts.length) return 0;
+    const l = ts[0].center - ts[0].tipWidth / 2;
+    const r = ts[ts.length - 1].center + ts[ts.length - 1].tipWidth / 2;
+    return (l + r) / 2 - lay.width / 2;
+  }
+
+  function shiftHandle(o, st, fs, x, y) {
+    if (!o.interactive) return '';
+    return '<g class="hd" tabindex="0" role="button" aria-label="Slide the whole pattern sideways" data-h="shift" data-edit="shift" style="cursor:ew-resize">' +
+      '<rect x="' + f3(x - 3.4 * fs) + '" y="' + f3(y - 1.4 * fs) + '" width="' + f3(6.8 * fs) + '" height="' + f3(2.8 * fs) + '" fill="transparent"/>' +
+      '<rect class="dot" x="' + f3(x - 2.6 * fs) + '" y="' + f3(y - 0.9 * fs) + '" width="' + f3(5.2 * fs) + '" height="' + f3(1.8 * fs) + '" rx="' + f3(0.9 * fs) +
+      '" stroke-width="' + f3(0.16 * fs) + '" style="fill:' + (st.surface || '#fff') + ';stroke:' + (st.accent || '#0f6b73') + '"/>' +
+      '<text x="' + f3(x) + '" y="' + f3(y + 0.32 * fs) + '" text-anchor="middle" font-size="' + f3(0.95 * fs) + '" style="fill:' + (st.accent || '#0f6b73') + '">\u25c2 \u25b8</text></g>';
+  }
+
   function tailPoly(lay, t, xBase, yTop, dir, st, fs) {
     const bw = baseWidth(t, lay.bit);
     const y1 = yTop + t.length;
@@ -294,6 +313,13 @@
       '" fill="none" style="stroke:' + st.ink + '" stroke-width="' + f3(0.08 * fs) + '"/>';
     s += label(op, x0 + W / 2, top + bodyH / 2 + 0.35 * fs, 'thickness ' + st.fmt(T1), st.muted, fs, { edit: { edit: 't1' }, aria: 'Tails board thickness' });
     let handles = '';
+    const off = patternOffset(lay);
+    if (ts.length) {
+      const shiftTxt = Math.abs(off) < 0.005 ? 'pattern centered' : 'pattern ' + st.fmt(Math.abs(off), true) + (off < 0 ? ' left' : ' right');
+      s += label(op, x0 + 1.2 * fs, top + bodyH / 2 + 0.35 * fs, shiftTxt, st.muted, fs, { anchor: 'start', edit: { edit: 'shift' }, aria: 'Pattern shift' });
+      const ctr = x0 + W / 2 + off;
+      handles += shiftHandle(op, st, fs, ctr, top);
+    }
     ts.forEach((t, i) => {
       const p = tailPoly(lay, t, x0, y0, 1, st, fs);
       s += p.svg;
@@ -301,6 +327,7 @@
       const ft = fracText(t.length / lay.thickness);
       if (ft) s += '<text x="' + f3(p.cx) + '" y="' + f3(p.y1 + 3.1 * fs) + '" text-anchor="middle" style="fill:' + st.muted + '">' + ft + ' t</text>';
       handles += handle(op, st, fs, p.cx, p.y1, 'Tail ' + (i + 1) + ' length, drag up or down', 'len', { i: i }, 'len', 'ns-resize');
+      handles += handle(op, st, fs, p.cx, y0 + 0.4 * t.length, 'Tail ' + (i + 1) + ', slide sideways', 'tailmove', { i: i }, null, 'ew-resize');
       if (op.mode === 'irregular') {
         handles += handle(op, st, fs, p.cx - t.tipWidth / 2, p.y1, 'Tail ' + (i + 1) + ' left edge', 'edge', { k: 2 * i + 1 }, null, 'ew-resize');
         handles += handle(op, st, fs, p.cx + t.tipWidth / 2, p.y1, 'Tail ' + (i + 1) + ' right edge', 'edge', { k: 2 * i + 2 }, null, 'ew-resize');
@@ -347,6 +374,7 @@
       s += p.svg;
       s += label(op, p.cx, p.y1 - 0.7 * fs, st.fmt(t.length, true), st.woodInk, fs, { edit: { edit: 'len', i: i }, aria: 'Socket ' + (i + 1) + ' depth' });
       handles += handle(op, st, fs, p.cx, p.y1, 'Socket ' + (i + 1) + ' depth, drag up or down', 'len', { i: i }, 'len', 'ns-resize');
+      handles += handle(op, st, fs, p.cx, top + 0.2 * t.length, 'Socket ' + (i + 1) + ', slide sideways', 'tailmove', { i: i }, null, 'ew-resize');
     });
     const yCut = top + lay.bit.cutterLen;
     const yWall = top + (T2 - lay.minWall);
@@ -429,6 +457,7 @@
     baseWidth: baseWidth,
     sortedTails: sortedTails,
     segments: segments,
+    patternOffset: patternOffset,
     fracText: fracText,
     tailStatus: tailStatus,
     check: check,

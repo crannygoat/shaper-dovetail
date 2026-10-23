@@ -48,6 +48,12 @@ is no form. The drawings are the controls:
 - Click any number to type it (`5/8`, `1 1/2`, `0.75`, `12mm`, or `7/8t` for a
   fraction of the mating board thickness). The bit and limits are click-to-type
   values under the drawings.
+- Placement: the pill on the tails board slides the whole pattern sideways
+  without changing any size (`--shift` in `layout.py`); type a signed distance
+  on the "pattern" label (negative is left). Each tail also has its own
+  sideways grip in both drawings, which makes the spacing irregular, so a
+  single tail can sit anywhere with its pins taking up the difference. The
+  mating board always follows, since both are drawn from one layout.
 - Toolbar: Even or Irregular spacing, tail count, length presets, in/mm.
 
 It flags errors and warnings, lists each tail, and prints the matching

@@ -9,7 +9,7 @@ process.stdin.on('end', () => {
   const out = cases.map((c) => {
     const n = c.kind === 'even' ? c.n : Math.floor(c.widths.length / 2);
     const lengths = DL.cycledLengths(c.thickness, c.fractions, n);
-    const opts = { minWall: c.minWall, minNeck: c.minNeck, ratio: c.ratio, halfPin: c.halfPin };
+    const opts = { minWall: c.minWall, minNeck: c.minNeck, ratio: c.ratio, halfPin: c.halfPin, shift: c.shift || 0 };
     const res = c.kind === 'even'
       ? DL.evenLayout(c.width, c.thickness, c.n, lengths, opts)
       : DL.fromWidths(c.thickness, c.widths, lengths, opts);

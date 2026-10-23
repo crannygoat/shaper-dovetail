@@ -177,7 +177,7 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
       <span>glue offset</span><button type="button" data-edit="glue"></button>
     </p>
     <input type="text" id="ed" hidden inputmode="text" autocomplete="off" spellcheck="false" aria-label="Type a value and press Enter">
-    <p class="hint">Round handles drag: tail tips set length, the lower corners of a tail set its width, the edges of the boards and the dashed lines set sizes. Hold Shift to skip snapping. Typing: 5/8, 1 1/2, 0.75, add mm or in to override the unit, or 7/8t for a fraction of the mating board thickness. Both boards are taken as the same width, as in a box corner.</p>
+    <p class="hint">Round handles drag: tail tips set length, the lower corners of a tail set its width, the edges of the boards and the dashed lines set sizes. Each tail has its own sideways grip, which makes the spacing irregular. Hold Shift to skip snapping. The pill on the tails board slides the whole pattern sideways without changing any size, and the mating board follows; type -1/4 for left. Typing: 5/8, 1 1/2, 0.75, add mm or in to override the unit, or 7/8t for a fraction of the mating board thickness. Both boards are taken as the same width, as in a box corner.</p>
   </div>
 
   <div class="out">
@@ -209,7 +209,7 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
   const FIGS = ['face', 'sec', 'side'];
 
   const DEFAULTS = {
-    mode: 'even', W: 152.4, T1: 19.05, T2: 15.875, n: 5, ratio: 2, halfPin: 0.5,
+    mode: 'even', shift: 0, W: 152.4, T1: 19.05, T2: 15.875, n: 5, ratio: 2, halfPin: 0.5,
     fracs: [2 / 3, 2 / 3, 2 / 3, 2 / 3, 2 / 3], widths: null,
     angle: 15, cutterDia: 13.8, cutterLen: 13.5, minWall: 3, minNeck: 3, glue: 0.1,
   };
@@ -259,6 +259,7 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
   function buildLayout() {
     const bit = { sideAngleDeg: S.angle, cutterDia: S.cutterDia, cutterLen: S.cutterLen };
     const opts = { bit: bit, minWall: S.minWall, minNeck: S.minNeck, glueOffset: S.glue, ratio: S.ratio, halfPin: S.halfPin };
+    if (S.mode === 'even') { const lim = edgeLimit(); S.shift = clamp(S.shift, -lim, lim); opts.shift = S.shift; }
     const lengths = S.fracs.map((f) => f * S.T2);
     const res = S.mode === 'even' ? DL.evenLayout(S.W, S.T2, S.n, lengths, opts) : DL.fromWidths(S.T2, S.widths, lengths, opts);
     if (res.layout) res.layout.tailsThickness = S.T1;
@@ -274,12 +275,12 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
     S.fracs = Array.from({ length: n }, (_, i) => (i < old.length ? old[i] : old[i % old.length]));
   }
   function evenWidthsMm() {
-    const res = DL.evenLayout(S.W, S.T2, S.n, S.fracs.map((f) => f * S.T2), { ratio: S.ratio, halfPin: S.halfPin });
+    const res = DL.evenLayout(S.W, S.T2, S.n, S.fracs.map((f) => f * S.T2), { ratio: S.ratio, halfPin: S.halfPin, shift: S.shift });
     return DL.segments(res.layout).map((g) => g.w);
   }
   function setMode(m) {
     if (m === S.mode) return;
-    if (m === 'irregular') { S.widths = evenWidthsMm(); S.mode = 'irregular'; syncIrregular(); }
+    if (m === 'irregular') { S.widths = evenWidthsMm(); S.shift = 0; S.mode = 'irregular'; syncIrregular(); }
     else { S.mode = 'even'; }
   }
   function setN(n) {
@@ -318,6 +319,26 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
     const np = S.widths[partner] - (mm - S.widths[k]);
     if (np < MINSEG) return 'The neighbouring segment would be narrower than ' + fmtUnit(MINSEG) + '.';
     S.widths[k] = mm; S.widths[partner] = np;
+    return null;
+  }
+  /* Room to slide the even pattern: each edge pin must stay at least MINSEG wide. */
+  function edgeLimit() {
+    const p = S.W / (2 * S.halfPin + S.n * (S.ratio + 1) - 1);
+    return Math.max(0, S.halfPin * p - MINSEG);
+  }
+  function patternOffsetNow() { return DL.patternOffset(curLay); }
+  /* off = where the middle of the pattern sits relative to the board centre (positive is right). */
+  function setPatternOffset(off) {
+    const delta = off - patternOffsetNow();
+    if (S.mode === 'even') {
+      const lim = edgeLimit();
+      if (lim <= 0) return 'No room to slide: the edge pins are already at the minimum. Give the pattern a wider half-pin first.';
+      S.shift = clamp(S.shift + delta, -lim, lim);
+      return null;
+    }
+    const w = S.widths, last = w.length - 1;
+    const d = clamp(delta, MINSEG - w[0], w[last] - MINSEG);
+    w[0] += d; w[last] -= d;
     return null;
   }
   function curP() { return S.W / (2 * S.halfPin + S.n * (S.ratio + 1) - 1); }
@@ -359,6 +380,21 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
         setWidth(clamp(snap(x, 'width', e), 20, cap));
         break;
       }
+      case 'shift': {
+        const err = setPatternOffset(snap(x - S.W / 2, 'seg', e));
+        if (err) notice(err);
+        break;
+      }
+      case 'tailmove': {
+        if (S.mode === 'even') { setMode('irregular'); notice('Spacing is now irregular: a single tail was moved. Even resets the formula.'); }
+        const t = DL.sortedTails(curLay)[d.i];
+        if (!t) break;
+        const target = snap(d.c0 + (e.clientX - d.sx) / d.ctm.a, 'seg', e);
+        const w = S.widths, k = 2 * d.i;
+        const mv = clamp(target - t.center, MINSEG - w[k], w[k + 2] - MINSEG);
+        w[k] += mv; w[k + 2] -= mv;
+        break;
+      }
       case 't1': S.T1 = Math.max(3, snap(x, 'thick', e)); break;
       case 't2': S.T2 = Math.max(3, snap(y, 'thick', e)); break;
       case 'len': {
@@ -377,7 +413,7 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
         break;
       }
       case 'half': {
-        let h = halfFromEdge(x);
+        let h = halfFromEdge(x - (S.mode === 'even' ? S.shift : 0));
         if (h === null) break;
         if (!e.shiftKey) h = Math.round(h * 20) / 20;
         S.halfPin = clamp(h, 0, 2);
@@ -410,6 +446,7 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
       ctm: { a: c.a, d: c.d, e: c.e, f: c.f }, x0: parseFloat(svg.dataset.x0), top: parseFloat(svg.dataset.top),
       sx: e.clientX, sy: e.clientY, moved: false, fig: fig.id.replace('Fig', ''),
     };
+    if (drag.h === 'tailmove' && curLay) { const tt = DL.sortedTails(curLay)[drag.i]; drag.c0 = tt ? tt.center : 0; }
     frozen = { ref: lastDims.ref, fs: lastDims.ref / 50, dims: { face: lastDims.face, sec: lastDims.sec, side: lastDims.side } };
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
@@ -440,6 +477,7 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
   }
   function editValue(key, i) {
     switch (key) {
+      case 'shift': { const o = patternOffsetNow(); return Math.abs(o) < 0.005 ? '0' : (o < 0 ? '-' : '') + fmtNum(Math.abs(o)); }
       case 'width': return fmtNum(S.W);
       case 't1': return fmtNum(S.T1);
       case 't2': return fmtNum(S.T2);
@@ -515,6 +553,13 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
       S.angle = a;
       return null;
     }
+    if (key === 'shift') {
+      const neg = /^\s*-/.test(txt);
+      const body = txt.replace(/^\s*-/, '').trim();
+      const mm = /^0+(\.0*)?$/.test(body) ? 0 : DL.parseDim(body, units);
+      if (!(mm >= 0)) return 'Enter how far to slide, such as 1/4 (right) or -1/4 (left), or 0 to center.';
+      return setPatternOffset(neg ? -mm : mm);
+    }
     const v = parseTyped(txt);
     if (key === 'len' && v.frac !== undefined) {
       if (!(v.frac > 0 && v.frac <= 1)) return 'A fraction of the thickness must be between 0 and 1, such as 7/8t.';
@@ -545,10 +590,9 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
       case 'pin': {
         if (S.mode === 'irregular') return setSeg(2 * i, mm);
         if (i === 0 || i === S.n) {
-          const h = mm / curP();
-          if (h > 2) return 'An edge pin that wide is not supported.';
-          S.halfPin = h;
-          return null;
+          const base = S.halfPin * curP();
+          const off = i === 0 ? mm - base : base - mm;
+          return setPatternOffset(off);
         }
         const r = ratioFromPin(mm);
         if (r === null || r < 0.5 || r > 6) return 'That pin width does not fit the board with ' + S.n + ' tails.';
@@ -677,7 +721,7 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
   function buildCommand() {
     const p = ['python3 layout.py', '--width ' + mmStr(S.W), '--thickness ' + mmStr(S.T2)];
     if (Math.abs(S.T1 - S.T2) > 1e-6) p.push('--tails-thickness ' + mmStr(S.T1));
-    if (S.mode === 'even') p.push('--tails ' + S.n, '--ratio ' + trim(S.ratio, 3), '--half-pin ' + trim(S.halfPin, 3));
+    if (S.mode === 'even') { p.push('--tails ' + S.n, '--ratio ' + trim(S.ratio, 3), '--half-pin ' + trim(S.halfPin, 3)); if (Math.abs(S.shift) > 1e-9) p.push('--shift ' + mmStr(S.shift)); }
     else p.push('--widths ' + S.widths.map(mmStr).join(','));
     p.push('--fractions "' + fractionsArg() + '"');
     const D = DL.DEFAULT_BIT, L = DL.DEFAULT_LIMITS;
@@ -705,6 +749,8 @@ td.ok { color: var(--ok); } td.warn { color: var(--warn); } td.err { color: var(
     const num = (v) => typeof v === 'number' && isFinite(v);
     if (!s || !['W', 'T1', 'T2', 'ratio', 'halfPin', 'angle', 'cutterDia', 'cutterLen', 'minWall', 'minNeck', 'glue'].every((k) => num(s[k]))) return false;
     if (!(s.W > 0 && s.T1 > 0 && s.T2 > 0 && s.angle >= 1 && s.angle <= 44)) return false;
+    if (s.shift === undefined) s.shift = 0;
+    if (!num(s.shift)) return false;
     if (!Number.isInteger(s.n) || s.n < 1 || s.n > 15) return false;
     if (!Array.isArray(s.fracs) || s.fracs.length !== s.n || !s.fracs.every((f) => num(f) && f > 0 && f <= 1)) return false;
     if (s.mode === 'irregular') {

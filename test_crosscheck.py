@@ -20,6 +20,8 @@ CASES = [
     dict(kind="even", width=150.0, thickness=15.0, n=5, fractions=fl("5/8,7/8"), ratio=2.0, halfPin=0.5, minWall=3.0, minNeck=3.0),
     dict(kind="even", width=300.0, thickness=19.0, n=9, fractions=fl("5/8,7/8"), ratio=1.5, halfPin=0.75, minWall=3.0, minNeck=3.0),
     dict(kind="even", width=60.0, thickness=12.0, n=3, fractions=fl("1/2"), ratio=3.0, halfPin=0.0, minWall=3.0, minNeck=6.0),
+    dict(kind="even", width=152.4, thickness=15.875, n=5, fractions=fl("5/8,7/8"), ratio=2.0, halfPin=1.0, minWall=1.5, minNeck=3.0, shift=6.0),
+    dict(kind="even", width=152.4, thickness=15.875, n=5, fractions=fl("2/3"), ratio=2.0, halfPin=0.5, minWall=3.0, minNeck=3.0, shift=-20.0),
     dict(kind="widths", width=100.0, thickness=15.0, widths=[5, 20, 10, 25, 10, 20, 10], fractions=fl("2/3"), ratio=2.0, halfPin=0.5, minWall=3.0, minNeck=3.0),
 ]
 
@@ -38,7 +40,7 @@ class CrossCheck(unittest.TestCase):
             kw = dict(min_wall=c["minWall"], min_neck=c["minNeck"], validate=False)
             if c["kind"] == "even":
                 lay = lo.even_layout(c["width"], c["thickness"], c["n"], lengths,
-                                     ratio=c["ratio"], half_pin=c["halfPin"], **kw)
+                                     ratio=c["ratio"], half_pin=c["halfPin"], shift=c.get("shift", 0.0), **kw)
             else:
                 lay = lo.from_widths(c["width"], c["thickness"], c["widths"], lengths, **kw)
             errors, warnings = lay.check()

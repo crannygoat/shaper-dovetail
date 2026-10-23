@@ -104,15 +104,17 @@ def cycled_lengths(thickness, fractions, n):
 
 
 def even_layout(width, thickness, n_tails, lengths, bit=None, ratio=2.0, half_pin=0.5,
-                validate=True, **kw):
+                validate=True, shift=0.0, **kw):
     """n tails across width. ratio = tail tip width / pin gap at the tips.
     half_pin = edge half-pin width as a fraction of a full pin gap.
-    width = p * (2*half_pin + n*(ratio + 1) - 1), solved for the pin gap p."""
+    width = p * (2*half_pin + n*(ratio + 1) - 1), solved for the pin gap p.
+    shift slides the whole pattern sideways (mm, positive is right); sizes do not change,
+    so the left edge pin grows by shift and the right one shrinks by it."""
     if n_tails < 1:
         raise ValueError("need at least one tail")
     p = width / (2 * half_pin + n_tails * (ratio + 1) - 1)
     t = ratio * p
-    x = half_pin * p
+    x = half_pin * p + shift
     tails = []
     for i in range(n_tails):
         tails.append(Tail(center=x + t / 2, tip_width=t, length=lengths[i]))
@@ -200,6 +202,8 @@ def main(argv=None):
     p.add_argument("--angle", type=float, default=15.0, help="bit side angle, degrees")
     p.add_argument("--cutter-dia", type=float, default=13.8, help="bit widest diameter, mm")
     p.add_argument("--cutter-len", type=float, default=13.5, help="bit cutter length, mm")
+    p.add_argument("--shift", type=float, default=0.0,
+                   help="even layout: slide the whole pattern sideways, mm (positive is right)")
     p.add_argument("--tails-thickness", type=float, default=None,
                    help="tails board thickness, mm (stored for the toolpath layer; default same as --thickness)")
     p.add_argument("--preview", help="write a preview SVG to this path")
@@ -214,7 +218,7 @@ def main(argv=None):
     else:
         lay = even_layout(a.width, a.thickness, a.tails,
                           cycled_lengths(a.thickness, fr, a.tails),
-                          bit=bit, ratio=a.ratio, half_pin=a.half_pin,
+                          bit=bit, ratio=a.ratio, half_pin=a.half_pin, shift=a.shift,
                           min_wall=a.min_wall, min_neck=a.min_neck, tails_thickness=a.tails_thickness)
     print(summary(lay))
     if a.preview:
